@@ -1,0 +1,56 @@
+This document contains the list of Third Party Software included with
+Security and Surveillance backend, along with the license information.
+
+Third Party Software may impose additional restrictions and it is the
+user's responsibility to ensure that they have met the licensing
+requirements of backend and the relevant license of the Third Party
+Software they are using.
+
+Cors
+url - https://github.com/expressjs/cors
+License - MIT
+Reference - https://github.com/expressjs/cors/blob/master/LICENSE
+
+exec
+url - https://github.com/bahamas10/node-exec
+License - none
+
+Express
+url - https://expressjs.com/
+License - MIT
+Reference - https://github.com/expressjs/express/blob/master/LICENSE
+
+mongoose
+url - https://github.com/Automattic/mongoose
+License - MIT
+Reference - https://github.com/angular/angular.js/blob/master/LICENSE
+
+passport
+url - https://github.com/jaredhanson/passport
+License - MIT
+Reference - https://github.com/jaredhanson/passport/blob/master/LICENSE
+
+passport-azure-ad
+url - https://github.com/AzureAD/passport-azure-ad
+License - MIT
+Reference - https://github.com/AzureAD/passport-azure-ad/blob/dev/LICENSE
+
+request
+url - https://github.com/request/request
+License - Apache License 2.0
+Reference - https://github.com/request/request/blob/master/LICENSE
+
+socket.io
+url - https://github.com/socketio/socket.io
+License - MIT
+Reference - https://github.com/socketio/socket.io/blob/master/LICENSE
+
+winston
+url - https://github.com/winstonjs/winston
+License - MIT
+Reference - https://github.com/winstonjs/winston/blob/master/LICENSE
+
+winston-daily-rotate-file
+url - https://github.com/winstonjs/winston-daily-rotate-file
+License - MIT
+Reference - https://github.com/winstonjs/winston-daily-rotate-file/blob/master/LICENSE

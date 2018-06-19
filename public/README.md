@@ -1,0 +1,1 @@
+# Folder to save floor map images

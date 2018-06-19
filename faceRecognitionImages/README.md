@@ -1,0 +1,1 @@
+# Folder to save face recognition user images

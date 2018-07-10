@@ -59,7 +59,7 @@ var config = {
     "cronJobIntervalMinutes": 16,
     "userNotificationTimeHr": 1,
     "videoIndexer": {
-        "ocpSubscriptionKey": "fb1edaf45a6b48abb38ae4fdbe3f6d1a",
+        "ocpSubscriptionKey": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
         "mediaWidgetUrl": "https://videobreakdown.azure-api.net/Breakdowns/Api/Partner/Breakdowns/$id/PlayerWidgetUrl",
         "insightsWidgetUrl": "https://videobreakdown.azure-api.net/Breakdowns/Api/Partner/Breakdowns/$id/InsightsWidgetUrl?allowEdit=true"
     },

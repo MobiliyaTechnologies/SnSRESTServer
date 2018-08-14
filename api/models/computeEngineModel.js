@@ -6,7 +6,6 @@ var detectionAlgoSchema = new Schema({
     fps: {type: Number},
     shapeSupported: [String],
     objectSupported: [String],
-    cloudServiceUrl: String,
     status : {type: Number , default: 0}
 })
 
@@ -25,7 +24,9 @@ var computeEngineSchema = baseModel.discriminator('computeEngineDetails', new Sc
     cameraSupported: { type: Number, required: true },
     availability: {type: Number},
     jetsonCamFolderLocation: {type: String},
-	wayToCommunicate: {type: String}
+    wayToCommunicate: {type: String},
+    tier: {type: Number, default: 0},
+    isCloudCompute: {type: Boolean, default: false}
 }));
 
 module.exports = computeEngineSchema;

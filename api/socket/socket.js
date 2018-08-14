@@ -42,7 +42,6 @@ socketIo.on('connection', function (socket) {
                 message.imageWidth = result.imageWidth;
                 message.frameWidth = { "width": result.frameWidth, "height": result.frameHeight };
                 message.coOrdinates = result.coordinates;
-                message.cloudServiceUrl = result.computeEngine.detectionAlgorithms[index].cloudServiceUrl;
                 message.wayToCommunicate = result.computeEngine.wayToCommunicate;
                 message.computeEngineFps = result.computeEngine.detectionAlgorithms[index].fps;
 

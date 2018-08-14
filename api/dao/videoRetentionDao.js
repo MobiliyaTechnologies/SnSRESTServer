@@ -137,6 +137,20 @@ var getRetentionCameras = function (req, res) {
     });
 }
 
+/** Delete videos by date */
+var deleteVideoByDate = function (req, res) {
+    logger.debug("%s : In deleteVideoByDate function", logStr);
+    videoRetention.remove({'date': req.query.date, camId: req.query.camId}, function (error, result) {
+        if (error) {
+            logger.error("%s : Error in deleteVideoByDate function : ", logStr, error);
+            errorHandler(error, res);
+            return;
+        }
+        logger.debug("%s : Sending Success response of deleteVideoByDate function.", logStr);
+        res.status(constants.httpStatusCodes.noContent).send();
+    })
+}
+
 exports.saveVideoRetention = saveVideoRetention;
 exports.getVideoRetentionDetails = getVideoRetentionDetails;
 exports.getVideoRetentionByVideoId = getVideoRetentionByVideoId;
@@ -144,3 +158,4 @@ exports.getExpiredVideos = getExpiredVideos;
 exports.removeMultipleVideo = removeMultipleVideo;
 exports.getRetentionCameras = getRetentionCameras;
 exports.deleteVideoRetentionDetails = deleteVideoRetentionDetails;
+exports.deleteVideoByDate = deleteVideoByDate;

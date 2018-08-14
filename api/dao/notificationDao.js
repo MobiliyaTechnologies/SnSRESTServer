@@ -11,6 +11,7 @@ var logStr = 'NotificationDao';
  */
 var createNotification = function (req,callback) {
     logger.debug("%s : In createNotification function", logStr);
+    req.timestamp = Math.round(new Date().setDate(new Date().getDate()) / 1000);
     notification.create(req, function (error, result) {
         if (error) {
             logger.error("%s : Error in createNotification function : ", logStr, error);
@@ -40,5 +41,21 @@ var getNotification = function(req,res){
     }).sort({ 'createdAt': -1 });
 };
 
+var removeReadNotifications = function(callback){
+    logger.debug("%s : In removeReadNotifications function" , logStr);
+    var timestampBeforeWeek = Math.round(new Date().setDate(new Date().getDate() - 7) / 1000);
+    notification.remove({timestamp : {$lt: timestampBeforeWeek}}, function(error, result){
+        if(error){
+            logger.error("%s : Error in removeReadNotifications function : ", logStr, error);
+            callback(error, null);
+        }
+        else{
+            logger.debug("%s : Sending Success response of removeReadNotifications function.", logStr);
+            callback(null, result);
+        }
+    });
+}
+
 exports.createNotification = createNotification;
 exports.getNotification = getNotification;
+exports.removeReadNotifications = removeReadNotifications;

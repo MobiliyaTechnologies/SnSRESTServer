@@ -59,11 +59,6 @@ var unregisterAlgorithm = function (req, res) {
                 errorHandler(error, res);
                 return;
             }
-            if (!result) {
-                logger.debug("%s : Compute engine not found error in registerAlgorithm function.", logStr);
-                errorHandler('ComputeEngineNotFoundError', res);
-                return;
-            }
             logger.debug("%s : Sending Success response of unregisterAlgorithm function.", logStr);
             res.status(constants.httpStatusCodes.noContent).send();
         });
@@ -232,6 +227,21 @@ var removeComputeEngineByDate = function (computeEngineIds, callback) {
     });
 };
 
+/** Return Face compute engine details */
+var getFaceComputeEngine = function(callback){
+    logger.debug("%s : In getFaceComputeEngine function", logStr);
+    computeEngine.find({ "detectionAlgorithms": {$elemMatch : { featureName: "faceRecognition" } } } , function(error, result){
+        if(error){
+            logger.error("%s : Error in getFaceComputeEngine function : ", logStr, error);
+            callback(error, null);
+        }
+        else{
+            logger.debug("%s : Sending Success response of getFaceComputeEngine function.", logStr);
+            callback(null, result);
+        }
+    });
+}
+
 exports.getComputeEngineByMacId = getComputeEngineByMacId;
 exports.registerComputeEngine = registerComputeEngine;
 exports.unregisterAlgorithm = unregisterAlgorithm;
@@ -243,3 +253,4 @@ exports.removeComputeEngine = removeComputeEngine;
 exports.getFeatureList = getFeatureList;
 exports.getComputeEngineByDate = getComputeEngineByDate;
 exports.removeComputeEngineByDate = removeComputeEngineByDate;
+exports.getFaceComputeEngine = getFaceComputeEngine;

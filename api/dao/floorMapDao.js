@@ -34,13 +34,8 @@ var updateFloorMap = function (req,res) {
             logger.error("%s : Error in updateFloorMap function : ", logStr, error);
             errorHandler(error, res);
         }
-        if (!result) {
-            logger.error("%s : Floor map not found error in updateFloorMap function : ", logStr);
-            errorHandler('CameraNotFoundError', res);
-            return;
-        }
         logger.debug("%s : Sending Success response of updateFloorMap function.", logStr);
-        res.status(constants.httpStatusCodes.success).send(result);
+        res.status(constants.httpStatusCodes.success).send({'message': 'Floor map updated'});
     });
 };
 

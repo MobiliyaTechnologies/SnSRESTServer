@@ -6,6 +6,7 @@ var notificationSchema = baseModel.discriminator('notificationDetails', new Sche
     _id: { type: Schema.ObjectId, auto: true},
     message: {type: String},
     isRead: {type: Number, default: 0},
+    timestamp: {type: Number},
     createdAt: { type : Date, default: Date.now }
 }));
 

@@ -25,6 +25,7 @@ var powerbiModel = require('./powerbiModel');
 var videoRetentionModel = require('./videoRetentionModel');
 var userHistoryModel = require('./userHistoryModel');
 var retentionPricingModel = require('./retentionPricingModel');
+var textRecognitionModel = require('./textRecognitionModel');
 
 /**
  * Build the connection string 

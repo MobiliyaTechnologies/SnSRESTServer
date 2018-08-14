@@ -169,13 +169,8 @@ var updateCamera = function (req, res) {
             logger.error("%s : Error in updateCamera function : ", logStr, error);
             errorHandler(error, res);
         }
-        if (!result) {
-            logger.error("%s : Camera not found error in updateCamera function : ", logStr);
-            errorHandler('CameraNotFoundError', res);
-            return;
-        }
         logger.debug("%s : Sending Success response of updateCamera function.", logStr);
-        res.status(constants.httpStatusCodes.success).send(result);
+        res.status(constants.httpStatusCodes.success).send({'message' : 'camera detials updated'});
     });
 };
 

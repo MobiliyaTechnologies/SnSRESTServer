@@ -1,12 +1,10 @@
-var fs = require('fs');
-var azure = require('azure-storage');
-var Readable = require('stream').Readable;
 var app = require('../../server');
 var request = require('request');
 var resultDao = require('../dao/resultDao');
 var cameraDao = require('../dao/cameraDao');
 var faceRecognitionDao = require('../dao/faceRecognitionDao');
 var userHistoryDao = require('../dao/userHistoryDao');
+var textRecognitionDao = require('../dao/textRecognitionDao');
 var notificationController = require('./notificationController');
 var constants = require('../config/constants');
 var errorHandler = require('../errorHandler/errorHandler').errorHandler;
@@ -22,8 +20,171 @@ var totalResultMap = app.totalResultMap;
 var triplineCamMap = app.triplineCamMap;
 var userIdentifiedMap = app.userIdentifiedMap;
 
-var blobService = azure.createBlobService(constants.blobStorage.blobStorageAccountName, constants.blobStorage.blobStorageAccessKey, constants.blobStorage.blobUri);
+var sendResults = function(eventData){
+    logger.debug("%s : Result data : "+ eventData.body, logStr);
+    var message = eventData.body;
+    var totalresult = message.totalCount;
+    var imageName = message.imageName;
+    var bbox = message.boundingBoxes;
+    var deviceName = message.deviceName;
+    var feature = message.feature;
+    var imageField = [];
 
+    if (imageName) {
+        imageField = imageName.split('_');
+    }
+     var currentTime = Math.round(((new Date).getTime()) / 1000);
+     var camId = imageField[0];
+
+    var analytics = {
+        'countPerBox': message.countPerBbox,
+        'totalResult': totalresult,
+        'bbox': bbox,
+        'imageName': imageName,
+        'camId': camId,
+        'deviceName': deviceName,
+        'feature': feature,
+        'bboxResults': message.bboxResults,
+        'imgBase64' : message.imageUrl,
+        'userId': message.userId
+    };
+
+    if (bbox && bbox.length > 0) {
+        bbox.forEach(function (resultBbox, index) {
+            if (resultBbox.persistedFaceId) {
+                var imageWidth = message.imageWidth;
+                var imageHeight = message.imageHeight;
+                var top = resultBbox.faceRectangle.top;
+                var left = resultBbox.faceRectangle.left;
+                var width = resultBbox.faceRectangle.width;
+                var height = resultBbox.faceRectangle.height;
+                
+                var userHistoryReq = {
+                    'camId': camId,
+                    'deviceName': deviceName,
+                    'persistedFaceId': resultBbox.persistedFaceId,
+                    'timestamp': currentTime,
+                    'relativeY': ((top + (height / 2)) * 100) / imageHeight,
+                    'relativeX': ((left + (width / 2)) * 100) / imageWidth,
+                    'userData': resultBbox.userData,
+                    'age': resultBbox.age,
+                    'gender': resultBbox.gender
+                }
+
+                userHistoryDao.saveUserHistory(userHistoryReq);
+            }
+            else if (feature === 'textRecognition') {
+                if (resultBbox.boundingBox && resultBbox.boundingBox.length !== 0) {
+                    var imageWidth = message.imageWidth;
+                    var imageHeight = message.imageHeight;
+                    var top = resultBbox.boundingBox.y2;
+                    var left = resultBbox.boundingBox.x1;
+                    var width = resultBbox.boundingBox.x2;
+                    var height = resultBbox.boundingBox.y2;
+                    var textData = {
+                        'matchedWord': resultBbox.line,
+                        'deviceName': deviceName,
+                        'camId': camId,
+                        'relativeY': ((top + (height / 2)) * 100) / imageHeight,
+                        'relativeX': ((left + (width / 2)) * 100) / imageWidth,
+                    };
+                    textRecognitionDao.addTextRecognitionDetails(textData);
+                }
+            }
+        });
+    }
+
+    /** Save result to database */
+    var resultData = {
+        'imageName': imageName,
+        'result': bbox,
+        'timestamp': currentTime,
+        'resultCount': totalresult,
+        'camId': camId,
+        'deviceName': deviceName,
+        'feature': feature,
+        'isTripline': message.isTripline,
+        'bboxResults': message.bboxResults
+    };
+
+    /**Send Live Data */
+    io.emit('liveResults', {
+        message: resultData
+    });
+
+    /** Send live camera dashbord result */
+    sendLiveCameraDashboardResult(camId, deviceName, totalresult, currentTime, message.bboxResults);
+
+    /**save count to database */
+    saveTotalCount(resultData);
+
+    /** If tripline crossed send notification */
+    if (message.isTripline) {
+        var triplineTimestamp = message.timestamp;
+        if (!triplineCamMap.has(camId)) {
+            return;
+        }
+
+        var triplineCamData = triplineCamMap.get(camId);
+        if (triplineCamData === 0) {
+            triplineCamMap.set(camId, { 'timestamp': triplineTimestamp, 'bboxResults': message.bboxResults, 'totalResult': totalresult });
+            io.emit('liveImage', {
+                message: analytics
+            });
+
+            if (totalresult > 0) {
+                var notificationReq = { 'message': 'Tripline Crossed' };
+                notificationController.createNotification(notificationReq, 'Tripline');
+            }
+            return;
+        }
+        else {
+            var newBboxResults = [];
+            var previousTriplineData = triplineCamData.bboxResults;
+            var currentTriplineData = message.bboxResults;
+            var totalTriplineResultCount = triplineCamData.totalResult;
+            previousTriplineData.forEach(function (previousResult, index) {
+                currentTriplineData.forEach(function (currentResult) {
+                    if (previousResult.markerName === currentResult.markerName) {
+                        var newResult = {};
+                        newResult.markerName = previousResult.markerName;
+                        newResult.tagName = previousResult.tagName;
+                        newResult.objectType = previousResult.objectType;
+                        newResult.count = parseInt(previousResult.count) + parseInt(currentResult.count);
+                        newBboxResults.push(newResult);
+                        totalTriplineResultCount = parseInt(totalTriplineResultCount) + parseInt(currentResult.count);
+                    }
+                });
+                if (index === previousTriplineData.length - 1) {
+                    if (triplineCamMap.get(camId).timestamp > triplineTimestamp) {
+                        triplineCamMap.set(camId, { 'timestamp': triplineCamMap.get(camId).timestamp, 'bboxResults': newBboxResults, 'totalResult': totalTriplineResultCount });
+                        return;
+                    }
+                    analytics.bboxResults = newBboxResults;
+                    analytics.totalResult = totalTriplineResultCount;
+                    io.emit('liveImage', {
+                        message: analytics
+                    });
+                    if (triplineCamData.totalResult < totalresult) {
+                        var notificationReq = { 'message': 'Tripline Crossed' };
+                        notificationController.createNotification(notificationReq, 'Tripline');
+                    }
+                    triplineCamMap.set(camId, { 'timestamp': triplineTimestamp, 'bboxResults': newBboxResults, 'totalResult': totalTriplineResultCount });
+                    return;
+                }
+            });
+        }
+    }
+
+    if (feature === 'faceRecognition') {
+        addUnknownUserData(bbox, message.imageUrl, message.userId, camId);
+    }
+
+    io.emit('liveImage', {
+        message: analytics
+    });
+ };
+ 
 /** This function will send live dashbord data to webapp */
 var sendLiveCameraDashboardResult = function (camId, deviceName, totalresult, currentTime, bboxResults) {
     if (liveCameraResultMap.has(camId)) {
@@ -65,60 +226,20 @@ var sendLiveCameraDashboardResult = function (camId, deviceName, totalresult, cu
     }
 }
 
-var uploadUserImage = function (base64, callback) {
-    var filename = 'faceRecogniton_' + (new Date).getTime() + '.jpg';
-    var base64Data = base64.replace(/^data:image\/jpg;base64,/,"")
-    var binaryData = new Buffer(base64Data, 'base64').toString('binary');
-    var imageFullPath = './faceRecognitionImages/' + filename;
-    var imageUrl = constants.blobStorage.blobUri + constants.blobStorage.blobContainerName + '/' + filename;
-    fs.writeFile(imageFullPath, binaryData, "binary", function(error) {
-       if(error){
-        logger.error("%s : Error while creating Image", logStr, error);
-        callback(error, null);
-       }
-       else{
-        blobService.createBlockBlobFromLocalFile(constants.blobStorage.blobContainerName, filename,imageFullPath,
-            function (error, result, response) {
-                if (error) {
-                    logger.error("%s : Error while uploading Image", logStr, error);
-                    callback(error, null);
-                }
-                else {
-                    logger.debug("%s : Image uploaded successfully", logStr);
-                    callback(null, { 'filename': imageUrl });
-                }
-                /** Delete uploaded file */
-                fs.unlink(imageFullPath, function (error) {
-                    if (error) {
-                        logger.error("%s : Error while deleting files", logStr, error);
-                    }
-                    logger.debug("%s : File deleted", logStr);
-                });
-            }
-        );
-       }
-    });
-}
-
 /** This function will save unknown user data from face recognition */
 var addUnknownUserData = function (bbox, imagBase64, userId, camId) {
     logger.debug("%s: In addUnknownUserData function", logStr);
     if (bbox) {
         bbox.forEach(function (result, index) {
             if (result.userData === 'Unknown') {
-                logger.debug("%S: Unknown face found", logStr);
-                uploadUserImage(imagBase64, function (error, blobResult) {
-                    if (error) {
-                        logger.error("%s : Error while uploading Image", logStr, error);
-                        return;
-                    }
+                logger.debug("%s: Unknown face found", logStr);
                     var faceData = {
                         'age': result.age,
                         'gender': result.gender,
                         'faceRectangle': result.faceRectangle,
                         'deviceName': result.deviceName,
                         'faceId': result.faceId,
-                        'imgUrl': blobResult.filename
+                        'imgUrl': imagBase64
                     };
                     faceRecognitionDao.addFaceList(faceData, function (error, result) {
                         if (error) {
@@ -127,10 +248,9 @@ var addUnknownUserData = function (bbox, imagBase64, userId, camId) {
                         }
                         logger.debug("%s: Face data saved", logStr);
                         //Send face recognition data
-                        result.imgUrl = blobResult.filename;
+                        result.imgUrl = imagBase64;
                         io.emit('faceRecognition/' + userId, JSON.stringify(result));
                     });
-                });
             }
             else {
                 if (result.flag) {
@@ -205,221 +325,12 @@ var saveTotalCount = function (resultData) {
     totalResultMap.set(resultData.camId, counts);
     resultData.totalCount = totalCount;
     /** Save result to database */
-    resultDao.addResult(resultData);
+    if(currentResult > 0){
+        resultDao.addResult(resultData);
+        return;
+    }
     return;
 }
-
-/** Get result of image */
-var getResult = function (req, res) {
-    logger.debug("%s : In getResult function. Received request : " + req.body.imageName, logStr);
-    res.status(constants.httpStatusCodes.success).send({ 'message': 'success' });
-
-    var totalresult = req.body.totalCount;
-    var imageName = req.body.imageName;
-    var bbox = req.body.boundingBoxes;
-    var imageField = [];
-
-    if (imageName) {
-        imageField = imageName.split('_');
-    }
-    var currentTime = Math.round(((new Date).getTime()) / 1000);
-    var camId = imageField[0];
-
-    var analytics = {
-        'countPerBox': req.body.countPerBbox,
-        'totalResult': totalresult,
-        'bbox': bbox,
-        'imageName': imageName,
-        'camId': camId,
-        'deviceName': req.body.deviceName,
-        'feature': req.body.feature,
-        'bboxResults': req.body.bboxResults,
-        'userId': req.body.userId
-    };
-
-    if (bbox && bbox.length > 0) {
-        bbox.forEach(function (faceBbox, index) {
-            if (faceBbox.persistedFaceId) {
-                var imageWidth = req.body.imageWidth;
-                var imageHeight = req.body.imageHeight;
-                var top = faceBbox.faceRectangle.top;
-                var left = faceBbox.faceRectangle.left;
-                var width = faceBbox.faceRectangle.width;
-                var height = faceBbox.faceRectangle.height;
-                
-                var userHistoryReq = {
-                    'camId': camId,
-                    'deviceName': req.body.deviceName,
-                    'persistedFaceId': faceBbox.persistedFaceId,
-                    'timestamp': currentTime,
-                    'relativeY': ((top + (height / 2)) * 100) / imageHeight,
-                    'relativeX': ((left + (width / 2)) * 100) / imageWidth,
-                    'userData': faceBbox.userData,
-                    'age': faceBbox.age,
-                    'gender': faceBbox.gender
-                }
-
-                userHistoryDao.saveUserHistory(userHistoryReq);
-            }
-        });
-    }
-
-    /** Save result to database */
-    var resultData = {
-        'imageName': imageName,
-        'result': bbox,
-        'timestamp': currentTime,
-        'resultCount': totalresult,
-        'camId': camId,
-        'deviceName': req.body.deviceName,
-        'feature': req.body.feature,
-        'isTripline': req.body.isTripline,
-        'bboxResults': req.body.bboxResults
-    };
-
-    /**Send Live Data */
-    io.emit('liveResults', {
-        message: resultData
-    });
-
-    /** Send live camera dashbord result */
-    sendLiveCameraDashboardResult(camId, req.body.deviceName, totalresult, currentTime, req.body.bboxResults);
-
-    /**save count to database */
-    saveTotalCount(resultData);
-
-    /** If tripline crossed send notification */
-    if (req.body.isTripline) {
-        var triplineTimestamp = req.body.timestamp;
-        if (!triplineCamMap.has(camId)) {
-            return;
-        }
-
-        var triplineCamData = triplineCamMap.get(camId);
-        if (triplineCamData === 0) {
-            triplineCamMap.set(camId, { 'timestamp': triplineTimestamp, 'bboxResults': req.body.bboxResults, 'totalResult': totalresult });
-            analytics.imgBase64 = req.body.imgBase64;
-            io.emit('liveImage', {
-                message: analytics
-            });
-
-            if (totalresult > 0) {
-                var notificationReq = { 'message': 'Tripline Crossed' };
-                notificationController.createNotification(notificationReq, 'Tripline');
-            }
-            return;
-        }
-        else {
-            var newBboxResults = [];
-            var previousTriplineData = triplineCamData.bboxResults;
-            var currentTriplineData = req.body.bboxResults;
-            var totalTriplineResultCount = triplineCamData.totalResult;
-            previousTriplineData.forEach(function (previousResult, index) {
-                currentTriplineData.forEach(function (currentResult) {
-                    if (previousResult.markerName === currentResult.markerName) {
-                        var newResult = {};
-                        newResult.markerName = previousResult.markerName;
-                        newResult.tagName = previousResult.tagName;
-                        newResult.objectType = previousResult.objectType;
-                        newResult.count = parseInt(previousResult.count) + parseInt(currentResult.count);
-                        newBboxResults.push(newResult);
-                        totalTriplineResultCount = parseInt(totalTriplineResultCount) + parseInt(currentResult.count);
-                    }
-                });
-                if (index === previousTriplineData.length - 1) {
-                    if (triplineCamMap.get(camId).timestamp > triplineTimestamp) {
-                        triplineCamMap.set(camId, { 'timestamp': triplineCamMap.get(camId).timestamp, 'bboxResults': newBboxResults, 'totalResult': totalTriplineResultCount });
-                        return;
-                    }
-                    analytics.imgBase64 = req.body.imgBase64;
-                    analytics.bboxResults = newBboxResults;
-                    analytics.totalResult = totalTriplineResultCount;
-                    io.emit('liveImage', {
-                        message: analytics
-                    });
-                    if (triplineCamData.totalResult < totalresult) {
-                        var notificationReq = { 'message': 'Tripline Crossed' };
-                        notificationController.createNotification(notificationReq, 'Tripline');
-                    }
-                    triplineCamMap.set(camId, { 'timestamp': triplineTimestamp, 'bboxResults': newBboxResults, 'totalResult': totalTriplineResultCount });
-                    return;
-                }
-            });
-        }
-    }
-
-    if (imageMap.has(imageName)) {
-        /** If faceRecognition data then add to facedetails */
-        if (req.body.feature === 'faceRecognition') {
-            addUnknownUserData(bbox, imageMap.get(imageName), req.body.userId, camId);
-        }
-
-        analytics.imgBase64 = imageMap.get(imageName);
-        io.emit('liveImage', {
-            message: analytics
-        });
-
-        var currentFileNameArray = imageName.split('_').join(',').split('.').join(',').split(',');
-        var currentImageTimestamp = currentFileNameArray[2];
-        for (var key of imageMap.keys()) {
-            var filenameKeys = key.split('_').join(',').split('.').join(',').split(',');
-            var mapFileTimestamp = filenameKeys[2];
-            if (key.startsWith(camId) && mapFileTimestamp < currentImageTimestamp && key !== imageName) {
-                imageMap.delete(key);
-            }
-        }
-
-        /**Remove image from imageMap*/
-        imageMap.delete(req.body.imageName);
-    }
-    else {
-        resultMap.set(req.body.imageName, analytics);
-    }
-};
-
-/** Get image */
-var getImage = function (req, res) {
-    logger.debug("%s : In getImage function. Received request: " + req.body.imgName, logStr);
-    var imageName = req.body.imgName;
-    var currentTime = Math.round(((new Date).getTime()) / 1000);
-    var imageField = [];
-    if (imageName) {
-        imageField = imageName.split('_');
-    }
-    var camId = imageField[0];
-
-    if (resultMap.has(imageName)) {
-        var analytics = resultMap.get(imageName);
-        /** If faceRecognition data then add to facedetails */
-        if (analytics.feature === 'faceRecognition') {
-            addUnknownUserData(analytics.bbox, req.body.imgBase64, analytics.userId, camId);
-        }
-
-        analytics.imgBase64 = req.body.imgBase64;
-        io.emit('liveImage', {
-            message: analytics
-        });
-
-        var currentFileNameArray = imageName.split('_').join(',').split('.').join(',').split(',');
-        var currentImageTimestamp = currentFileNameArray[2];
-        for (var key of resultMap.keys()) {
-            var filenameKeys = key.split('_').join(',').split('.').join(',').split(',');
-            var mapFileTimestamp = filenameKeys[2];
-            if (key.startsWith(analytics.camId) && mapFileTimestamp < currentImageTimestamp && key !== imageName) {
-                resultMap.delete(key);
-            }
-        }
-
-        /** Remove result from resultMap*/
-        resultMap.delete(req.body.imgName);
-    }
-    else {
-        imageMap.set(req.body.imgName, req.body.imgBase64);
-    }
-
-    logger.debug("%s : Sending Success response of getImage function.", logStr);
-    res.status(constants.httpStatusCodes.success).send({ 'message': 'success' });
-};
 
 var getDetectionCountByFeature = function (req, res) {
     resultDao.getDetectionCountByFeature(req, res);
@@ -491,6 +402,10 @@ var getLiveCameraResults = function (req, res) {
         liveCameraResultMap.clear();
         var filter = req.body.filter;
         if (filter === 'camera') {
+            if(cameraArray.length === 0){
+                errorHandler('UnprocessableEntity', res);
+                return;
+            }
             cameraArray.forEach(function (camera, index) {
                 var liveDashboardReq = {
                     'userId': userId,
@@ -509,6 +424,10 @@ var getLiveCameraResults = function (req, res) {
         }
         else if (filter === 'marker') {
             var markerNames = [];
+            if(cameraArray.length === 0){
+                errorHandler('UnprocessableEntity', res);
+                return;
+            }
             cameraArray.forEach(function (camera, index) {
                 var liveDashboardReq = {
                     'userId': userId,
@@ -540,8 +459,7 @@ var getLiveCameraResults = function (req, res) {
     }
 }
 
-exports.getResult = getResult;
-exports.getImage = getImage;
+exports.sendResults = sendResults;
 exports.getDetectionCountByFeature = getDetectionCountByFeature;
 exports.getDetectionCountByCameras = getDetectionCountByCameras;
 exports.getLiveCameraResults = getLiveCameraResults;

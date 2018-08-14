@@ -4,11 +4,12 @@ var videoRetentiionDao = require('../dao/videoRetentionDao');
 var notificationController = require('../controller/notificationController');
 var constants = require('../config/constants');
 var logger = require('../logger/index').logger;
-var logStr = 'VideoRetentionDao';
+var logStr = 'RemoveExpiredVideosCron';
 
 var blobService = azure.createBlobService(constants.videoBlobStorage.blobStorageAccountName, constants.videoBlobStorage.blobStorageAccessKey, constants.videoBlobStorage.blobUri);
 
 var job = new CronJob('00 00 00 * * *', function () {
+    logger.debug("%s : Remove expired videos cron job executed", logStr);
     getExpiredVideos();
 }, function () { }, true);
 

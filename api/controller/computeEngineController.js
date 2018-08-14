@@ -59,11 +59,7 @@ var registerAlgorithm = function (req, res) {
             errorHandler(error, res);
             return;
         }
-        if (!result) {
-            errorHandler('ComputeEngineNotFoundError', res);
-            return;
-        }
-        res.status(constants.httpStatusCodes.resourceCreated).send(result);
+        res.status(constants.httpStatusCodes.resourceCreated).send({'message': 'Algorithm registered successfully'});
     });
 }
 
@@ -81,6 +77,13 @@ var updateComputeEngine = function (req, res) {
             errorHandler('ComputeEngineNotFoundError', res);
             return;
         }
+        /**Send pricing tier to compute engine */
+        var messageReq = {'tier': req.body.tier};
+        var message = new Message(JSON.stringify(messageReq));
+        message.ack = 'full';
+        message.messageId = "toggleTier";
+        iotHubClient.send(req.params.id, message, iotHubErrorHandler('send'));
+
         var updateReq = {};
         updateReq.queryCondition = { '_id': result._id };
         updateReq.updateData = {};
@@ -101,6 +104,7 @@ var updateComputeEngine = function (req, res) {
             updateReq.updateData = updateData;
         }
         else{
+            server.facePricingTier = req.body.tier;
             var updateData = {};
             updateData = req.body;
             updateData.status = result.status;
@@ -117,11 +121,7 @@ var updateComputeEngineErrorHandler = function (error, result, res) {
         errorHandler(error, res);
         return;
     }
-    if (!result) {
-        errorHandler('ComputeEngineNotFoundError', res);
-        return;
-    }
-    res.status(constants.httpStatusCodes.success).send(result);
+    res.status(constants.httpStatusCodes.success).send({'message': 'Compute engine details updated'});
 }
 
 var getAllComputeEngines = function (req, res) {

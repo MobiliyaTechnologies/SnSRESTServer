@@ -45,12 +45,12 @@ var config = {
     },
     "imageDirectory": "./Cameras",
     "faceApiConfig": {
-        "faceApiSubscriptionKey": process.env.CUSTOMCONNSTR_faceApiSubscriptionKey,
+        "standardFaceApiBaseUrl": process.env.CUSTOMCONNSTR_standardFaceApiBaseUrl + "facelists/0/persistedFaces",
+        "standardFaceApiSubscriptionKey": process.env.CUSTOMCONNSTR_standardFaceApiSubscriptionKey,
+        "freeFaceApiBaseUrl": process.env.CUSTOMCONNSTR_freeFaceApiBaseUrl + "facelists/0/persistedFaces",
+        "freeFaceApiSubscriptionKey": process.env.CUSTOMCONNSTR_freeFaceApiSubscriptionKey,
         "faceApiContentTypeHeader": "application/json",
-        "faceApiBaseUrl": process.env.CUSTOMCONNSTR_faceApiBaseUrl + "facelists/0/persistedFaces",
         "faceApiMethodType": "POST",
-        "findSimilarFacesUrl": process.env.CUSTOMCONNSTR_faceApiBaseUrl + "findsimilars",
-        "findSimilarApiContentType": "application/json",
         "removeFaceAPIMethodType": "DELETE"
     },
     "mobileImageType": "Mobile",
@@ -64,8 +64,9 @@ var config = {
         "insightsWidgetUrl": "https://videobreakdown.azure-api.net/Breakdowns/Api/Partner/Breakdowns/$id/InsightsWidgetUrl?allowEdit=true"
     },
     "iotHubConfig": {
-        "connectionString": process.env.CUSTOMCONNSTR_iothubConnectionString
-
+        "connectionString": process.env.CUSTOMCONNSTR_iothubConnectionString,
+        "eventHubConnectionString": process.env.CUSTOMCONNSTR_eventHubConnectionString,
+        "eventHubName": process.env.CUSTOMCONNSTR_eventHubName
     },
     "blobStorage": {
         "blobUri": process.env.CUSTOMCONNSTR_blobUri,

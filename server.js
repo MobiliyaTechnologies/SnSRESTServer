@@ -14,6 +14,7 @@ var index = require('./api/models/index');
 var resultDao = require('./api/dao/resultDao');
 var roleController = require('./api/controller/roleController');
 var roleDao = require('./api/dao/roleDao');
+var computeEngineDao = require('./api/dao/computeEngineDao');
 var errorHandler = require('./api/errorHandler/errorHandler').errorHandler;
 var logger = require('./api/logger/index').logger;
 var logStr = 'App';
@@ -27,6 +28,7 @@ var totalResultMap = new Map();
 var triplineCamMap = new Map();
 var userIdentifiedMap = new Map();
 var isUserExist = true;
+var facePricingTier = 0;
 
 var port = config.port;
 if(process.env && process.env.PORT){
@@ -79,6 +81,22 @@ roleDao.getUserCount(function (error, result) {
     exports.isUserExist = isUserExist;
 });
 
+
+/** Get face recognition pricing tier*/
+computeEngineDao.getFaceComputeEngine(function(error, result){
+    if(error){
+        logger.error("%s: Error in getFaceComputeEngine function", logStr, error);
+        facePricingTier = 0;
+    }
+    else if(result.length === 0){
+        facePricingTier = 0;
+    }
+    else{
+        facePricingTier = result[0].tier;
+    }
+    exports.facePricingTier = facePricingTier;
+});
+
 exports.server = server;
 exports.mobileCamMap = mobileCamMap;
 exports.imageMap = imageMap;
@@ -89,13 +107,15 @@ exports.totalResultMap = totalResultMap;
 exports.triplineCamMap = triplineCamMap;
 exports.userIdentifiedMap = userIdentifiedMap;
 
-
 var socketIo = require('./api/socket/socket');
 var iotHubClient = require('./api/iothub/iotHubClient');
+var iotHubEventListener = require('./api/iothub/iothubEventListener');
 
 /** Cron jobs */
 var removeDevice = require('./api/jobs/removeDevice');
 var removeExpiredVideos = require('./api/jobs/removeExpiredVideos');
+var removeReadNotifications = require('./api/jobs/removeNotifications');
+var removeResults = require('./api/jobs/removeResults');
 
 /** Test route */
 app.get('/_ping', function (req, res) {

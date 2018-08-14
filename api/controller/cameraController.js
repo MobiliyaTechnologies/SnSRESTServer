@@ -107,7 +107,7 @@ var setBoundingBox = function (req, res) {
         delete req.body.Coords;
         req.body.boundingBox = result.boundingBox;
         logger.debug("%s : Sending Success response of setBoundingBox function.", logStr);
-        res.status(constants.httpStatusCodes.success).send(result);
+        res.status(constants.httpStatusCodes.success).send({'message': 'Bounding box updated'});
         return;
     });
 }
@@ -131,7 +131,7 @@ var validateCamera = function (req, res) {
             message.messageId = "checkCamera";
             iotHubClient.send(req.body.aggregatorId, message, iotHubErrorHandler('send'));
             logger.error("%s : Camera not found error in validateCamera", logStr);
-            res.status(constants.httpStatusCodes.resourceCreated).send({ "message": 'Device not found,sent request to aggregator' });
+            res.status(constants.httpStatusCodes.resourceCreated).send({ "message": 'Device not found,sent request to aggregator', 'status': constants.httpStatusCodes.resourceCreated });
             return;
         }
         logger.debug("%s : Sending Success response of validateCamera function.", logStr);
@@ -177,14 +177,9 @@ var increaseComputeEngineAvilability = function (req, res, camResult) {
             message: stopCameraRes
             
         });
-        if(camResult.feature === 'faceRecognition'){
+        if(camResult.feature === 'faceRecognition' || camResult.feature === 'textRecognition' || camResult.feature === 'faceDetection'){
             userIdentifiedMap.set(req.body.camId, []);
             iotHubClient.send(req.body.aggregatorId, message, iotHubErrorHandler('send'));
-            res.status(constants.httpStatusCodes.success).send({ 'message': 'Camera status updated' });
-            return;
-        }
-        else if(camResult.boundingBox && camResult.boundingBox[0].shape === 'Line'){
-            iotHubClient.send(req.body.computeEngineId, message, iotHubErrorHandler('send'));
             res.status(constants.httpStatusCodes.success).send({ 'message': 'Camera status updated' });
             return;
         }
@@ -225,11 +220,12 @@ var updateComputeEngineAvailability = function (updateAvailabilityReq, req, res,
             }
             if (startStreamingReq.boundingBox && startStreamingReq.boundingBox[0].shape === 'Line') {
                 iotHubClient.send(req.body.computeEngineId, message, iotHubErrorHandler('send'));
+                iotHubClient.send(req.body.aggregatorId, message, iotHubErrorHandler('send'));
                 triplineCamMap.set(req.body.camId, 0);
                 res.status(constants.httpStatusCodes.success).send({ 'message': 'Camera status updated' });
                 return;
             }
-            else if (startStreamingReq.feature === 'faceRecognition') {
+            else if (startStreamingReq.feature === 'faceRecognition' || startStreamingReq.feature === 'textRecognition' || startStreamingReq.feature === 'faceDetection') {
                 userIdentifiedMap.delete(req.body.camId);
                 iotHubClient.send(req.body.aggregatorId, message, iotHubErrorHandler('send'));
                 res.status(constants.httpStatusCodes.success).send({ 'message': 'Camera status updated' });
@@ -274,7 +270,6 @@ var getStartStreamingCameraDetails = function (req, res, result) {
                 "aggregatorId": cameraResult.aggregator._id,
                 "computeEngineId": cameraResult.computeEngine._id,
                 "jetsonCamFolderLocation": cameraResult.computeEngine.jetsonCamFolderLocation,
-                "cloudServiceUrl": cameraResult.computeEngine.detectionAlgorithms[index].cloudServiceUrl,
                 "wayToCommunicate": cameraResult.computeEngine.wayToCommunicate,
                 "computeEngineFps": cameraResult.computeEngine.detectionAlgorithms[index].fps,
                 "sendImagesFlag": req.body.sendImagesFlag,
@@ -360,7 +355,7 @@ var getRawImage = function (req, res) {
     message.ack = 'full';
     message.messageId = "getRawImage";
     iotHubClient.send(req.body.aggregatorId, message, iotHubErrorHandler('send'));
-    res.status(constants.httpStatusCodes.success).send({ "message": "Request sent to aggregator" });
+    res.status(constants.httpStatusCodes.success).send({ "message": "Request sent to aggregator", status: constants.httpStatusCodes.success });
 }
 
 /** Delete camera from database and publish same device id on stopCamera topic */
@@ -481,6 +476,7 @@ var toggleStreaming = function (req, res) {
     var toggleFlag = req.body.flag;
     var camId = req.body.camId;
     var aggregatorId = req.body.aggregatorId;
+    var computeEngineId = req.body.computeEngineId;
     var userId = req.headers['userid'];
     var message = new Message(JSON.stringify(req.body));
     message.ack = 'full';
@@ -495,6 +491,7 @@ var toggleStreaming = function (req, res) {
             streamingReqMap.set(camId, 1);
         }
         iotHubClient.send(aggregatorId, message, iotHubErrorHandler('send'));
+        iotHubClient.send(computeEngineId, message, iotHubErrorHandler('send'));
         res.status(constants.httpStatusCodes.success).send({ "message": "success" });
         return;
     }
@@ -503,6 +500,7 @@ var toggleStreaming = function (req, res) {
         streamingReqMap.set(camId, count - 1);
         if (streamingReqMap.get(camId) === 0) {
             iotHubClient.send(aggregatorId, message, iotHubErrorHandler('send'));
+            iotHubClient.send(computeEngineId, message, iotHubErrorHandler('send'));
         }
         res.status(constants.httpStatusCodes.success).send({ "message": "success" });
         return;

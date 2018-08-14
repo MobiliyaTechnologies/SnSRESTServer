@@ -6,6 +6,7 @@ var faceRecognitionDao = require('../dao/faceRecognitionDao');
 var constants = require('../config/constants');
 var request = require('request');
 var errorHandler = require('../errorHandler/errorHandler').errorHandler;
+var server = require('../../server');
 var logger = require('../logger/index').logger;
 var logStr = 'FaceRecognitionController';
 
@@ -37,8 +38,16 @@ function addFacesToList(req, res, result) {
     logger.debug("%s : In addFacesToList function: " + req.body.userData, logStr);
     var userData = req.body.userData;
     var rect = result.faceRectangle;
+
+    var baseFaceUrl = constants.faceApiConfig.freeFaceApiBaseUrl;
+    var faceApiSubscriptionKey = constants.faceApiConfig.freeFaceApiSubscriptionKey;
+    if(server.facePricingTier){
+        baseFaceUrl = constants.faceApiConfig.standardFaceApiBaseUrl;
+        faceApiSubscriptionKey = constants.faceApiConfig.standardFaceApiSubscriptionKey;
+    }
+    
     var headers = {
-        'Ocp-Apim-Subscription-Key': constants.faceApiConfig.faceApiSubscriptionKey,
+        'Ocp-Apim-Subscription-Key': faceApiSubscriptionKey,
         'Content-Type': constants.faceApiConfig.faceApiContentTypeHeader
     }
 
@@ -47,7 +56,7 @@ function addFacesToList(req, res, result) {
     }
 
     var optionsFaceApi = {
-        url: constants.faceApiConfig.faceApiBaseUrl + '?userData=' + userData + '&targetFace=' + rect.left + ',' + rect.top + ',' + rect.width + ',' + rect.height,
+        url: baseFaceUrl + '?userData=' + userData + '&targetFace=' + rect.left + ',' + rect.top + ',' + rect.width + ',' + rect.height,
         method: constants.faceApiConfig.faceApiMethodType,
         headers: headers,
         body: JSON.stringify(reqBody)
@@ -149,13 +158,20 @@ removeFaceFromBlob = function(imgUrl){
 
 /**Remove from face list */
 var removeFaceFromFaceList = function(persistedFaceId){
+    var baseFaceUrl = constants.faceApiConfig.freeFaceApiBaseUrl;
+    var faceApiSubscriptionKey = constants.faceApiConfig.freeFaceApiSubscriptionKey;
+    if(server.facePricingTier){
+        baseFaceUrl = constants.faceApiConfig.standardFaceApiBaseUrl;
+        faceApiSubscriptionKey = constants.faceApiConfig.standardFaceApiSubscriptionKey;
+    }
+
     var headers = {
-        'Ocp-Apim-Subscription-Key': constants.faceApiConfig.faceApiSubscriptionKey,
+        'Ocp-Apim-Subscription-Key': faceApiSubscriptionKey,
         'Content-Type': constants.faceApiConfig.faceApiContentTypeHeader
     }
 
     var optionsFaceApi = {
-        url: constants.faceApiConfig.faceApiBaseUrl + '/' + persistedFaceId,
+        url: baseFaceUrl + '/' + persistedFaceId,
         method: constants.faceApiConfig.removeFaceAPIMethodType,
         headers: headers
     }

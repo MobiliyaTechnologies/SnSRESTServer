@@ -54,12 +54,8 @@ var updateAggregator = function (req, res) {
             errorHandler(error, res);
             return;
         }
-        if (!result) {
-            errorHandler('AggregatorNotFoundError', res);
-            return;
-        }
         logger.debug("%s : Sending Success response of updateAggregator function.", logStr);
-        res.status(constants.httpStatusCodes.success).send(result);
+        res.status(constants.httpStatusCodes.success).send({'message': 'Aggregator details updated'});
     });
 };
 

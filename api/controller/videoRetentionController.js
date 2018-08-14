@@ -55,7 +55,16 @@ var getRetentionCameras = function(req, res){
     videoRetentionDao.getRetentionCameras(req, res);
 }
 
+var deleteVideoByDate = function(req, res){
+    if(!(req.query.date && req.query.camId)){
+        errorHandler('UnprocessableEntity', res);
+        return;
+    }
+    videoRetentionDao.deleteVideoByDate(req, res);
+}
+
 exports.saveVideoRetention = saveVideoRetention;
 exports.getRetentionCameras = getRetentionCameras;
 exports.getVideoRetentionDetails = getVideoRetentionDetails;
 exports.deleteVideoRetentionDetails = deleteVideoRetentionDetails;
+exports.deleteVideoByDate = deleteVideoByDate;

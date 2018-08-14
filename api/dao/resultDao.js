@@ -162,7 +162,23 @@ var getLatestResult = function (callback) {
     });
 }
 
+var removeOldResults = function(callback){
+    logger.debug("%s : In removeOldResults function" , logStr);
+    var timestampBeforeMonth = Math.round(new Date().setDate(new Date().getDate() - 30) / 1000);
+    result.remove({timestamp : {$lt: timestampBeforeMonth}}, function(error, result){
+        if(error){
+            logger.error("%s : Error in removeOldResults function : ", logStr, error);
+            callback(error, null);
+        }
+        else{
+            logger.debug("%s : Sending Success response of removeOldResults function.", logStr);
+            callback(null, result);
+        }
+    });
+}
+
 exports.addResult = addResult;
 exports.getDetectionCountByFeature = getDetectionCountByFeature;
 exports.getDetectionCountByCameras = getDetectionCountByCameras;
 exports.getLatestResult = getLatestResult;
+exports.removeOldResults = removeOldResults;

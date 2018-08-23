@@ -1,6 +1,6 @@
 var request = require('request');
 var constants = require('../config/constants');
-var powerbiDao = require('../dao/powerBiDao');
+var powerbiDao = require('../dao/powerbiDao');
 var errorHandler = require('../errorHandler/errorHandler').errorHandler;
 
 var getAccessToken = function (req, res) {
